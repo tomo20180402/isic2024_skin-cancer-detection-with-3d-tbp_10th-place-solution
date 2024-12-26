@@ -138,3 +138,6 @@ valid_transform = transforms.Compose([
 )
 ...
 ```
+
+# Development Environment
+Kaggle Docker Image: `gcr.io/kaggle-gpu-images/python:v137`
