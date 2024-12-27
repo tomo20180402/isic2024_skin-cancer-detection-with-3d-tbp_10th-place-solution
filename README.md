@@ -1,10 +1,44 @@
-# 10th place solution
-competition: https://www.kaggle.com/competitions/isic-2024-challenge  
-Jun 27, 2024 - Sep 7, 2024
+# ISIC 2024 - 10th Place Solution
+* [Competition](https://www.kaggle.com/competitions/isic-2024-challenge  )
+* Period: Jun 27, 2024 - Sep 7, 2024
+* Final Rank: 10 / 2,739 (solo)
 
-# Overview
+# Environment Setup
+This project uses the Kaggle Docker Image:
+```
+gcr.io/kaggle-gpu-images/python:v137
+```
+
+# Usage Guide
+
+## Training Process
+
+### 1. Configure Parameters
+Edit `scripts/config.py` with the following settings:
+* `IS_TRAIN`: Set to `True`
+* `PATTERN`: Choose either `1` or `2`
+* `DATA_DIR`: Specify the directory containing input data
+* `OUTPUT_DIR`: Define where you want the output files to be saved
+
+### 2. Run Training
+Open `submission.ipynb` and execute the following sections:
+* 1st Stage Training
+* 2nd Stage Training
+
+## Inference Process
+
+### 1. Set Model Paths
+In `scripts/prediction.py`, update the following functions:
+* `get_img_model_paths()`
+* `get_gbdt_model_paths()`
+
+### 2. Generate Predictions
+Open `submission.ipynb` and run the "Prediction" section
+
+# Solution
+
+## Overview
 <img width="800" alt="isic2024_overview" src="https://github.com/user-attachments/assets/e396501f-9b2b-4128-8008-520354f991af" />
-
 
 - **CV=0.183, Public LB=0.181, Private LB=0.171**
 - Two-stage model
@@ -12,7 +46,7 @@ Jun 27, 2024 - Sep 7, 2024
     - 2nd stage: GBDT (LightGBM, XGBoost, CatBoost), using predictions from 1st stage and tabular data as input
 - The core of the solution is strategies for improving model generalization.
 
-# Strategies for improving model generalization
+## Strategies for improving model generalization
 Basically, trust CV.
 Even if CV slightly worsens, I applied techniques if I thought they would improve generalization performance.
 1. Repeat undersampling
@@ -38,7 +72,7 @@ Even if CV slightly worsens, I applied techniques if I thought they would improv
     - Included this 50% in the ensemble as a second submission, but it worsened except for public LB
         - cv=0.182, public LB=0.182, private LB=0.170
 
-# 1st stage
+## 1st Stage
 - Model
     - EfficientNet-B0
 - Augmentation
@@ -98,7 +132,7 @@ valid_transform = transforms.Compose([
 ])
 ```
 
-# 2nd stage
+## 2nd Stage
 - Model
     - LightGBM, XGBoost, CatBoost
 - Feature
@@ -138,6 +172,3 @@ valid_transform = transforms.Compose([
 )
 ...
 ```
-
-# Development Environment
-Kaggle Docker Image: `gcr.io/kaggle-gpu-images/python:v137`
