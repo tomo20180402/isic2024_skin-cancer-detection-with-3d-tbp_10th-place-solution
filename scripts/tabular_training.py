@@ -64,11 +64,11 @@ def run(train_metadata_df: pl.DataFrame) -> None:
                 end_idx = int(width) * (iset+1)
 
                 _train = pd.concat([
-                    train.loc[start_idx:end_idx].loc[train['target']==0].sample(frac=1.0, random_state=420).groupby('patient_id').head(50).reset_index(),
+                    train.loc[start_idx:end_idx].loc[train['target']==0].sample(frac=1.0, random_state=420).reset_index(),
                     train.loc[train['target']==1],
                 ], axis=0)
                 _train_aug = pd.concat([
-                    train.loc[start_idx:end_idx].loc[train['target']==0].sample(frac=1.0, random_state=520).groupby('patient_id').head(50).reset_index(),
+                    train.loc[start_idx:end_idx].loc[train['target']==0].sample(frac=1.0, random_state=520).reset_index(),
                     train.loc[train['target']==1],
                 ], axis=0)
                 attribution_cols = [col for col in _train_aug.columns if col.startswith('attribution_')]
