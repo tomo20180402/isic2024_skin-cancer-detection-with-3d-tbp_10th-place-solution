@@ -4,6 +4,7 @@ from typing import List, Dict, Tuple, Union
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 import polars as pl
 import torch
 import torch.nn as nn
