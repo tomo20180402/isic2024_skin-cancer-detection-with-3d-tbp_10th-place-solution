@@ -85,16 +85,7 @@ def load_catb(model_path: str) -> catb.CatBoostClassifier:
     return catb_model
 
 
-def predict(
-        test_metadata_df: pl.DataFrame,
-        test_dataloader: DataLoader,
-        img_models: List[torch.nn.Module],
-        lgb_models: List[lgb.Booster],
-        xgb_models: List[xgb.Booster],
-        catb_models: List[catb.CatBoostClassifier],
-        feature_cols: List[str],
-        y_pred_img_name: str) -> np.ndarray:
-    ### 1st stage
+def predict_1st_stage(test_dataloader: DataLoader, img_models: List[torch.nn.Module], y_pred_img_name: str) -> pl.DataFrame:
     preds_list = []
     for imgs, _ in tqdm(test_dataloader, total=len(test_dataloader)):
         imgs = imgs.to(cfg.DEVICE)
@@ -106,36 +97,60 @@ def predict(
                 _preds_list.append(preds)
             preds_list.append(torch.vstack(_preds_list))
         torch.cuda.empty_cache()
-
     img_preds = torch.hstack(preds_list).numpy().mean(axis=0)
     img_pred_df = pl.DataFrame(img_preds, schema=[y_pred_img_name])
+    return img_pred_df
 
-    ### 2nd stage
-    test_metadata_with_pred_df = pl.concat([test_metadata_df, img_pred_df], how='horizontal')
-    # lgb
+
+def predict_2nd_stage_lgb(X_test: pd.DataFrame, lgb_models: List[lgb.Booster]) -> np.ndarray:
     lgb_pred_list = []
     for lgb_model in lgb_models:
-        lgb_pred = lgb_model.predict(
-            test_metadata_with_pred_df.select(feature_cols + [y_pred_img_name]).to_pandas()
-        )
+        lgb_pred = lgb_model.predict(X_test)
         lgb_pred_list.append(lgb_pred)
     lgb_pred = np.mean(lgb_pred_list, axis=0)
-    # xgb
-    xgb_test = xgb.DMatrix(test_metadata_with_pred_df.select(feature_cols + [y_pred_img_name]).to_pandas())
+    return lgb_pred
+
+
+def predict_2nd_stage_xgb(X_test: pd.DataFrame, xgb_models: List[xgb.Booster]) -> np.ndarray:
+    xgb_test = xgb.DMatrix(X_test)
     xgb_pred_list = []
     for xgb_model in xgb_models:
         xgb_pred = xgb_model.predict(xgb_test)
         xgb_pred_list.append(xgb_pred)
     xgb_pred = np.mean(xgb_pred_list, axis=0)
-    # catb
-    catb_test = catb.Pool(test_metadata_with_pred_df.select(feature_cols + [y_pred_img_name]).to_pandas())
+    return xgb_pred
+
+
+def predict_2nd_stage_catb(X_test: pd.DataFrame, catb_models: List[catb.CatBoostClassifier]) -> np.ndarray:
+    catb_test = catb.Pool(X_test)
     catb_pred_list = []
     for catb_model in catb_models:
         catb_pred = catb_model.predict(catb_test, prediction_type='Probability')[:, 1]
         catb_pred_list.append(catb_pred)
-    catb_pred = np.mean(catb_pred_list, axis=0)        
-    # ens
-    y_pred = (lgb_pred + xgb_pred + catb_pred) / 3
+    catb_pred = np.mean(catb_pred_list, axis=0)
+    return catb_pred
+
+
+def predict(
+        test_metadata_df: pl.DataFrame,
+        test_dataloader: DataLoader,
+        img_models: List[torch.nn.Module],
+        lgb_models: List[lgb.Booster],
+        xgb_models: List[xgb.Booster],
+        catb_models: List[catb.CatBoostClassifier],
+        feature_cols: List[str],
+        y_pred_img_name: str) -> np.ndarray:
+
+    # 1st stage
+    img_pred_df = predict_1st_stage(test_dataloader, img_models, y_pred_img_name)
+
+    # 2nd stage
+    test_metadata_with_pred_df = pl.concat([test_metadata_df, img_pred_df], how='horizontal')
+    X_test = test_metadata_with_pred_df.select(feature_cols + [y_pred_img_name]).to_pandas()
+    lgb_pred = predict_2nd_stage_lgb(X_test, lgb_models)  # lgb
+    xgb_pred = predict_2nd_stage_xgb(X_test, xgb_models)  # xgb
+    catb_pred = predict_2nd_stage_catb(X_test, catb_models)  # catb
+    y_pred = (lgb_pred + xgb_pred + catb_pred) / 3  # ensemble
 
     return y_pred
 
@@ -170,8 +185,7 @@ def predict_batch(
             shuffle=False,
             num_workers=cfg.N_WORKER,
             prefetch_factor=2,
-            pin_memory=True,
-        )
+            pin_memory=True)
 
         y_pred = predict(
             test_metadata_df=test_metadata_df[start_idx:end_idx],
